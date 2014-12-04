@@ -1,1 +1,4 @@
-__author__ = 'sergey'
+try:
+    from local_settings import *
+except ImportError:
+    pass
