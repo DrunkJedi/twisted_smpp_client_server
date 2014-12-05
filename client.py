@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
+from time import sleep
 
 from twisted.internet.protocol import Protocol, ClientFactory
 from twisted.internet import reactor, task
 from smpp.pdu import operations
 
 from pdu_bin import PDUBin
-from local_client_settings import HOST, PORT, LOGIN, PASSWORD, SMSCOUNT
-
+from client_settings import HOST, PORT, LOGIN, PASSWORD, SMSCOUNT
 
 
 class MyProtocol(Protocol, PDUBin):
@@ -94,8 +94,19 @@ class MyProtocol(Protocol, PDUBin):
                                               system_id=LOGIN,
                                               password=PASSWORD,
                                               system_type='speedflow')
+        bin_pdu = self._pdu2bin(bind_pdu)
 
-        self.transport.write(self._pdu2bin(bind_pdu))
+        # first = bin[:10]
+        # last = bin[10:]
+        #
+        # print 'first', first.__len__()
+        # self.transport.getHandle().sendall(first)
+        # sleep(1)
+        #
+        # print 'last', last.__len__()
+        # self.transport.write(last)
+
+        self.transport.write(bin_pdu)
 
 
 class EchoClientFactory(ClientFactory):
