@@ -28,7 +28,7 @@ class MyProtocol(Protocol, PDUBin):
         pdu = self._bin2pdu(data)
         if pdu.commandId.key == 'submit_sm_resp':
             self.submit_sm_resp_count += 1
-            print 'submit_sm_resp: ', self.submit_sm_resp_count
+            print 'submit_sm_resp: ', self.submit_sm_resp_count, pdu.status
             if SMSCOUNT == self.submit_sm_resp_count:
                 self._unbind()
         elif pdu.commandId.key == 'bind_transmitter_resp' and pdu.status.key == 'ESME_ROK' and self.status != self.BINDED:
@@ -105,8 +105,10 @@ class MyProtocol(Protocol, PDUBin):
         #
         # print 'last', last.__len__()
         # self.transport.write(last)
-
         self.transport.write(bin_pdu)
+
+
+
 
 
 class EchoClientFactory(ClientFactory):

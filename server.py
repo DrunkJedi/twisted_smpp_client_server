@@ -1,10 +1,16 @@
 from twisted.internet.protocol import Protocol, ServerFactory
 from twisted.internet import reactor
 from smpp.pdu import operations
+from smpp.pdu.pdu_types import CommandStatus
 from smpp.pdu.error import PDUParseError
 
 from pdu_bin import PDUBin, MsgDataListener
+from server_settings import client_login, client_password
 
+UNAUTORIZED = 'unauthorized'
+AUTORIZED = 'authorized'
+CONNECTED = 'connected'
+DISCONNECTED = 'disconnected'
 
 class MyProtocol(Protocol, PDUBin):
 
@@ -25,37 +31,42 @@ class MyProtocol(Protocol, PDUBin):
                 # the one that told it to close.
                 return
 
-            # try:
-            #     self.pduReceived(self._bin2pdu(msg))
-            # except PDUParseError as e:
-            #     self.PDUParseErrorHandler(exception=e, wrong_bin=msg)
-            pdu = self._bin2pdu(msg)
-            self.pduReceived(pdu)
+            try:
+                self.pduReceived(self._bin2pdu(msg))
+            except PDUParseError as e:
+                self.PDUParseErrorHandler(exception=e, wrong_bin=msg)
+
             msg = self._data_listener.get_msg()
-            # pdu = self._bin2pdu(msg)
-            # print pdu
 
     def connectionMade(self):
         self._data_listener = MsgDataListener()
+        self.state = CONNECTED
 
     def connectionLost(self, reason):
-        pass
+        self.state = DISCONNECTED
 
     def pduReceived(self, pdu):
         # TODO states
         if pdu.commandId.key == 'submit_sm':
-            # todo status
+            if self.state == AUTORIZED:
+                submit_sm_resp = operations.SubmitSMResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_ROK)
+            else:
+                submit_sm_resp = operations.SubmitSMResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_RINVSYSID)
             self.transport.write(
-                self._pdu2bin(operations.SubmitSMResp(seqNum=pdu.seqNum))
+                self._pdu2bin(submit_sm_resp)
             )
         elif pdu.commandId.key == 'bind_transmitter':
-            bind_resp = operations.BindTransmitterResp(seqNum=pdu.seqNum)
-            # todo status, ANOTHER PARAMS READ DOC, check login psawd
+            if pdu.params['system_id'] == client_login and pdu.params['password'] == client_password:
+                bind_resp = operations.BindTransmitterResp(seqNum=pdu.seqNum)
+                self.state = AUTORIZED
+            else:
+                bind_resp = operations.BindTransmitterResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_RINVSYSID)
+                self.state = UNAUTORIZED
             self.transport.write(self._pdu2bin(bind_resp))
 
         elif pdu.commandId.key == 'unbind':
             self.transport.write(self._pdu2bin(operations.UnbindResp(seqNum=pdu.seqNum)))
-            # todo close connection
+            self.transport.loseConnection()
 
 
 class MyServerFactory(ServerFactory):
