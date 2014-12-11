@@ -45,6 +45,8 @@ class MyProtocol(Protocol, PDUBin):
     def connectionMade(self):
         self.status = self.CONNECTED
         self._bind()
+        # self.status = self.BINDED
+        # self._send_sms.start(0.2)
 
     def connectionLost(self, reason):
         self.status = self.DISCONNECTED
