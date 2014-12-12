@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from time import sleep
-
 from twisted.internet.protocol import Protocol, ClientFactory
 from twisted.internet import reactor, task
 from smpp.pdu import operations
@@ -128,6 +126,6 @@ class EchoClientFactory(ClientFactory):
     def clientConnectionFailed(self, connector, reason):
         print 'Connection failed. Reason:', reason, '\n'
 
-
-reactor.connectTCP(HOST, PORT, EchoClientFactory())
-reactor.run()
+if __name__ == '__main__':
+    reactor.connectTCP(HOST, PORT, EchoClientFactory())
+    reactor.run()

@@ -1,5 +1,4 @@
 .env
 *.pyc
 .idea
-local_client_settings.py
-local_server_settings.py
+local_settings.py
