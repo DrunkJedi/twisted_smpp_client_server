@@ -7,8 +7,8 @@ from smpp.pdu.error import PDUParseError
 from pdu_bin import PDUBin, MsgDataListener
 from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
 
-UNAUTORIZED = 'unauthorized'
-AUTORIZED = 'authorized'
+UNAUTHORIZED = 'unauthorized'
+AUTHORIZED = 'authorized'
 CONNECTED = 'connected'
 DISCONNECTED = 'disconnected'
 
@@ -47,29 +47,27 @@ class MyProtocol(Protocol, PDUBin):
         self.state = DISCONNECTED
 
     def pduReceived(self, pdu):
-        # TODO states
         if pdu.commandId.key == 'submit_sm':
-            if self.state == AUTORIZED:
-                submit_sm_resp = operations.SubmitSMResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_ROK)
+            if self.state == AUTHORIZED:
+                resp_pdu = operations.SubmitSMResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_ROK)
             else:
-                #todo NACK
-                submit_sm_resp = operations.GenericNack(seqNum=pdu.seqNum, status=CommandStatus.ESME_RINVSYSID)
+                resp_pdu = operations.GenericNack(seqNum=pdu.seqNum, status=CommandStatus.ESME_RINVSYSID)
 
             self.transport.write(
-                self._pdu2bin(submit_sm_resp)
+                self._pdu2bin(resp_pdu)
             )
         elif pdu.commandId.key == 'bind_transmitter':
             if pdu.params['system_id'] == CLIENT_LOGIN and pdu.params['password'] == CLIENT_PASSWORD:
                 bind_resp = operations.BindTransmitterResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_ROK)
-                self.state = AUTORIZED
+                self.state = AUTHORIZED
             else:
                 bind_resp = operations.BindTransmitterResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_RINVSYSID)
-                self.state = UNAUTORIZED
+                self.state = UNAUTHORIZED
 
             self.transport.write(self._pdu2bin(bind_resp))
 
         elif pdu.commandId.key == 'unbind':
-            if self.state == AUTORIZED:
+            if self.state == AUTHORIZED:
                 self.transport.write(self._pdu2bin(operations.UnbindResp(seqNum=pdu.seqNum)))
                 self.transport.loseConnection()
             else:

@@ -110,9 +110,6 @@ class MyProtocol(Protocol, PDUBin):
         self.transport.write(bin_pdu)
 
 
-
-
-
 class EchoClientFactory(ClientFactory):
     protocol = MyProtocol
 
