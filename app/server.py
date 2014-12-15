@@ -19,22 +19,24 @@ class MyProtocol(Protocol, PDUBin):
         self._data_listener = None
 
     def dataReceived(self, data):
-        # print data.__len__()
-        # print data
+
         self._data_listener.append_buffer(data)
         msg = self._data_listener.get_msg()
 
         while msg is not None:
-            if self.transport.disconnecting:
-                # this is necessary because the transport may be told to lose
-                # the connection by a previous packet, and it is
-                # important to disregard all the packets following
-                # the one that told it to close.
-                return
+            # if self.transport.disconnecting:
+            #     # this is necessary because the transport may be told to lose
+            #     # the connection by a previous packet, and it is
+            #     # important to disregard all the packets following
+            #     # the one that told it to close.
+            #     return
 
             try:
-                self.pduReceived(self._bin2pdu(msg))
+                print 'asdasdasdkafdlk aajdflkas j'
+                pdu = self._bin2pdu(msg)
+                self.pduReceived(pdu)
             except PDUParseError as e:
+                print 'asdadas'
                 self.PDUParseErrorHandler(exception=e, wrong_bin=msg)
 
             msg = self._data_listener.get_msg()
@@ -82,6 +84,6 @@ class MyServerFactory(ServerFactory):
         p = ServerFactory.buildProtocol(self, addr)
         return p
 
-
-reactor.listenTCP(2775, MyServerFactory())
-reactor.run()
+if __name__ == '__main__':
+    reactor.listenTCP(2775, MyServerFactory())
+    reactor.run()
