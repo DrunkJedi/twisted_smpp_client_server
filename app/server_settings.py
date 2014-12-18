@@ -1,2 +1,2 @@
-CLIENT_LOGIN = 'smppclient1'
+CLIENT_LOGIN = 'login'
 CLIENT_PASSWORD = 'password'

@@ -6,7 +6,7 @@ from smpp.pdu import operations
 from mock import patch
 
 from app.server import CONNECTED, DISCONNECTED, AUTHORIZED, UNAUTHORIZED
-from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
+from app.server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
 from app.server import MyServerFactory
 
 
@@ -101,7 +101,7 @@ class TestServerProto:
                                          system_type='speedflow')
         pdu_submit_sm = operations.SubmitSM()
         pdu_unbind = operations.Unbind()
-        bin_list = [pdu_bind_wrong, pdu_submit_sm_wrong, pdu_bind, pdu_submit_sm, pdu_unbind, pdu_unbind]
+        bin_list = [pdu_bind_wrong, pdu_submit_sm_wrong, pdu_bind, pdu_submit_sm, pdu_unbind]
         proto.connectionLost(proto)
 
         for pdu in bin_list:

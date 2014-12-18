@@ -6,18 +6,18 @@ from smpp.pdu import operations
 from pdu_bin import PDUBin
 from client_settings import HOST, PORT, LOGIN, PASSWORD, SMSCOUNT
 
+CONNECTED = 'connected'
+DISCONNECTED = 'disconnected'
+BINDED = 'binded'
+UNBINDED = 'unbinded'
 
 class MyProtocol(Protocol, PDUBin):
 
-    CONNECTED = 'connected'
-    DISCONNECTED = 'disconnected'
-    BINDED = 'binded'
-    UNBINDED = 'unbinded'
-
     def __init__(self):
+        self.SMSCOUNT = SMSCOUNT
         self.submit_sm_resp_count = 0
         self.submit_sm_count = 0
-        self.status = self.DISCONNECTED
+        self.state = DISCONNECTED
         # created schedule task
         # will start after success auth
         self._send_sms = task.LoopingCall(self._submit_sm)
@@ -27,27 +27,27 @@ class MyProtocol(Protocol, PDUBin):
         if pdu.commandId.key == 'submit_sm_resp':
             self.submit_sm_resp_count += 1
             print 'submit_sm_resp: ', self.submit_sm_resp_count, pdu.status
-            if SMSCOUNT == self.submit_sm_resp_count:
+            if self.SMSCOUNT == self.submit_sm_resp_count:
                 self._unbind()
-        elif pdu.commandId.key == 'bind_transmitter_resp' and pdu.status.key == 'ESME_ROK' and self.status != self.BINDED:
-            self.status = self.BINDED
+        elif pdu.commandId.key == 'bind_transmitter_resp' and pdu.status.key == 'ESME_ROK' and self.state != BINDED:
+            self.state = BINDED
             print 'Auth OK'
             self._send_sms.start(0.2)
         elif pdu.commandId.key == 'unbind_resp':
-            self.status = self.UNBINDED
+            self.state = UNBINDED
             self.transport.loseConnection()
             print 'Unbinding done'
         else:
             print 'Get pdu {0}'.format(pdu)
 
     def connectionMade(self):
-        self.status = self.CONNECTED
+        self.state = CONNECTED
         self._bind()
-        # self.status = self.BINDED
+        # self.state = self.BINDED
         # self._send_sms.start(0.2)
 
     def connectionLost(self, reason):
-        self.status = self.DISCONNECTED
+        self.state = DISCONNECTED
         print 'onConnectionLost:'
         print self.transport.realAddress, '\n'
 
@@ -55,7 +55,7 @@ class MyProtocol(Protocol, PDUBin):
         return self.submit_sm_count + 1
 
     def _submit_sm(self):
-        if SMSCOUNT > self.submit_sm_count and self.status == self.BINDED:
+        if self.SMSCOUNT > self.submit_sm_count and self.state == BINDED:
             seq_num = self._get_seq_num()
 
             print 'Submit sm: ', seq_num
@@ -70,7 +70,8 @@ class MyProtocol(Protocol, PDUBin):
             self.transport.write(self._pdu2bin(sm_pdu))
             self.submit_sm_count += 1
         else:
-            self._send_sms.stop()
+            if self._send_sms.running:
+                self._send_sms.stop()
 
     def _enqire_link(self):
         print 'Sending enqirelink start\n'
