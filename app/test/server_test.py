@@ -3,8 +3,10 @@ from twisted.test import proto_helpers
 from smpp.pdu import pdu_types
 from smpp.pdu.pdu_encoding import PDUEncoder
 from smpp.pdu import operations
+from mock import patch
 
-
+from app.server import CONNECTED, DISCONNECTED, AUTHORIZED, UNAUTHORIZED
+from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
 from app.server import MyServerFactory
 
 
@@ -28,7 +30,7 @@ class TestServerProto:
 
         proto.makeConnection(trans)
 
-        #mock pduReceived
+        # mock pduReceived
         proto.pduReceived = MagicMock()
 
         # create dummy pdus
@@ -64,20 +66,63 @@ class TestServerProto:
         proto, trans = self._setup()
         proto.makeConnection(trans)
 
-        #mock PDUParseErrorHandler
+        # mock PDUParseErrorHandler
         proto.PDUParseErrorHandler = MagicMock()
 
         # create dummy pdus
         bind_tr = operations.BindTransmitter(seqNum=1, system_id='armen', password='666', system_type='speedflow')
         valid_bin = proto._pdu2bin(bind_tr)
-
-        bad_bin = valid_bin[3:] + valid_bin[:5]
+        bad_bin = valid_bin[:5] + 'f' + valid_bin[6:]
 
         proto.dataReceived(bad_bin)
 
         # get all pdu received calls
-        calls = proto.PDUParseErrorHandler.call_args_list
+        assert proto.PDUParseErrorHandler.called
 
-        print calls
+    def test_disconnect(self):
+        proto, trans = self._setup()
+        proto.makeConnection(trans)
+        proto.connectionLost(self)
+        assert proto.state == DISCONNECTED
 
-        assert False
+    def test_statuses(self):
+        proto, trans = self._setup()
+        proto.makeConnection(trans)
+        assert proto.state == CONNECTED
+        proto.transport.write = MagicMock()
+        pdu_bind_wrong = operations.BindTransmitter()
+        # assert proto._bin2pdu(proto.transport.write.call_args_list.pop()[0][0]).status.key == 'ESME_RINVSYSID'
+        pdu_submit_sm_wrong = operations.SubmitSM()
+
+        # print proto._bin2pdu(proto.transport.write.call_args_list.pop()[0][0])
+        pdu_bind = operations.BindTransmitter(seqNum=1,
+                                         system_id=CLIENT_LOGIN,
+                                         password=CLIENT_PASSWORD,
+                                         system_type='speedflow')
+        pdu_submit_sm = operations.SubmitSM()
+        pdu_unbind = operations.Unbind()
+        bin_list = [pdu_bind_wrong, pdu_submit_sm_wrong, pdu_bind, pdu_submit_sm, pdu_unbind, pdu_unbind]
+        proto.connectionLost(proto)
+
+        for pdu in bin_list:
+            proto.dataReceived(proto._pdu2bin(pdu))
+
+        # pdu_bind_wrong resp
+        pdu = proto._bin2pdu(proto.transport.write.call_args_list[0][0][0])
+        assert pdu.status.key == 'ESME_RINVSYSID' and pdu.commandId.key == 'bind_transmitter_resp'
+
+        # pdu_submit_sm wrong
+        pdu = proto._bin2pdu(proto.transport.write.call_args_list[1][0][0])
+        assert pdu.status.key == 'ESME_RINVSYSID' and pdu.commandId.key == 'generic_nack'
+
+        # pdu_bind ok
+        pdu = proto._bin2pdu(proto.transport.write.call_args_list[2][0][0])
+        assert pdu.status.key == 'ESME_ROK' and pdu.commandId.key == 'bind_transmitter_resp'
+
+        # pdu_submit ok
+        pdu = proto._bin2pdu(proto.transport.write.call_args_list[3][0][0])
+        assert pdu.status.key == 'ESME_ROK' and pdu.commandId.key == 'submit_sm_resp'
+
+        # pdu_unbind ok
+        pdu = proto._bin2pdu(proto.transport.write.call_args_list[4][0][0])
+        assert pdu.status.key == 'ESME_ROK' and pdu.commandId.key == 'unbind_resp'

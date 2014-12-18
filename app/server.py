@@ -32,11 +32,9 @@ class MyProtocol(Protocol, PDUBin):
             #     return
 
             try:
-                print 'asdasdasdkafdlk aajdflkas j'
                 pdu = self._bin2pdu(msg)
                 self.pduReceived(pdu)
             except PDUParseError as e:
-                print 'asdadas'
                 self.PDUParseErrorHandler(exception=e, wrong_bin=msg)
 
             msg = self._data_listener.get_msg()
