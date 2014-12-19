@@ -58,6 +58,11 @@ class TestClientProtoCreation:
         pdu_submit_sm_resp = operations.SubmitSMResp(seqNum=1, status=CommandStatus.ESME_ROK)
         proto.dataReceived(proto._pdu2bin(pdu_submit_sm_resp))
 
+        # enqure_link
+        proto._enqire_link()
+        pdu_enqire_link = proto._bin2pdu(proto.transport.write.call_args_list.pop()[0][0])
+        assert pdu_enqire_link.status == CommandStatus.ESME_ROK and pdu_enqire_link.commandId.key == 'enquire_link'
+
         # client must send unbind pdu
         pdu_unbind = proto._bin2pdu(proto.transport.write.call_args_list.pop()[0][0])
         assert pdu_unbind.status == CommandStatus.ESME_ROK and pdu_unbind.commandId.key == 'unbind'
