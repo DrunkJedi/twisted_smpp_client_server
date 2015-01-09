@@ -1,11 +1,20 @@
-from twisted.internet.protocol import Protocol, ServerFactory
+from twisted.internet.protocol import Protocol, ServerFactory, ClientCreator
 from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
+
 from smpp.pdu import operations
 from smpp.pdu.pdu_types import CommandStatus
 from smpp.pdu.error import PDUParseError
 
+from txamqp.client import TwistedDelegate
+from txamqp.protocol import AMQClient
+from txamqp.content import Content
+import txamqp.spec
+
 from pdu_bin import PDUBin, MsgDataListener
 from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
+
+import datetime
 
 UNAUTHORIZED = 'unauthorized'
 AUTHORIZED = 'authorized'
@@ -17,9 +26,20 @@ class MyProtocol(Protocol, PDUBin):
 
     def __init__(self):
         self._data_listener = None
+        self.publish_channel = None
+
+    @inlineCallbacks
+    def initRabbitConnection(self):
+        spec = txamqp.spec.load('amqp0-8.stripped.rabbitmq.xml')
+        delegate = TwistedDelegate()
+        protocol = yield ClientCreator(reactor, AMQClient, delegate=delegate, vhost='/',
+                                            spec=spec).connectTCP('localhost', 5672)
+        yield protocol.start({'LOGIN': 'sergey', 'PASSWORD': 'pepsi'})
+        self.publish_channel = yield protocol.channel(1)
+        yield self.publish_channel.channel_open()
+
 
     def dataReceived(self, data):
-
         self._data_listener.append_buffer(data)
         msg = self._data_listener.get_msg()
 
@@ -39,16 +59,32 @@ class MyProtocol(Protocol, PDUBin):
 
             msg = self._data_listener.get_msg()
 
+    @inlineCallbacks
     def connectionMade(self):
         self._data_listener = MsgDataListener()
         self.state = CONNECTED
+        yield self.initRabbitConnection()
 
     def connectionLost(self, reason):
         self.state = DISCONNECTED
 
+    @inlineCallbacks
+    def processMessage(self, msg):
+        print self.publish_channel
+        if self.publish_channel:
+            result = yield self.publish_channel.queue_declare(exclusive=True)
+            msg = Content('asdasdas')
+            self.publish_channel.basic_publish(exchange='',
+                                  routing_key='rpc_queue',
+                                  content=msg)
+
     def pduReceived(self, pdu):
         if pdu.commandId.key == 'submit_sm':
             if self.state == AUTHORIZED:
+                # TODO create connection to rabbit mq
+                # TODO push message to route.send.result
+                self.processMessage(pdu)
+
                 resp_pdu = operations.SubmitSMResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_ROK)
             else:
                 resp_pdu = operations.GenericNack(seqNum=pdu.seqNum, status=CommandStatus.ESME_RINVSYSID)
