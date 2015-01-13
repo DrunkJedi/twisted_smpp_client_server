@@ -14,8 +14,6 @@ import txamqp.spec
 from pdu_bin import PDUBin, MsgDataListener
 from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
 
-import datetime
-
 UNAUTHORIZED = 'unauthorized'
 AUTHORIZED = 'authorized'
 CONNECTED = 'connected'
@@ -39,6 +37,7 @@ class MyProtocol(Protocol, PDUBin):
 		yield protocol.start({'LOGIN': 'sergey', 'PASSWORD': 'pepsi'})
 		self.publish_channel = yield protocol.channel(1)
 		yield self.publish_channel.channel_open()
+		yield self.publish_channel.queue_declare(queue='process_queue', durable=True)
 
 
 	def dataReceived(self, data):
@@ -68,9 +67,12 @@ class MyProtocol(Protocol, PDUBin):
 		self.state = DISCONNECTED
 
 	@inlineCallbacks
-	def processMessage(self, msg):
-		yield self.publish_channel.queue_declare(exclusive=True)
+	def processSubmitSM(self, msg):
+		queue = yield self.publish_channel.queue_declare(exclusive=True)
 
+		wasd = Content('Hello')
+		self.publish_channel.basic_publish(exchange='', routing_key="process_queue", content=wasd)
+		print wasd
 		# msg = Content('asdasdas')
 		# self.publish_channel.basic_publish(exchange='',
 		# routing_key='rpc_queue',
@@ -83,8 +85,8 @@ class MyProtocol(Protocol, PDUBin):
 				# TODO push message to route.send.result
 				self.submit_sm_buffer.append(pdu)
 				if self.publish_channel is not None:
-					for i in self.submit_sm_buffer:
-						self.processMessage(i)
+					for imsg in self.submit_sm_buffer:
+						self.processSubmitSM(imsg)
 					self.submit_sm_buffer = []
 				resp_pdu = operations.SubmitSMResp(seqNum=pdu.seqNum, status=CommandStatus.ESME_ROK)
 			else:
