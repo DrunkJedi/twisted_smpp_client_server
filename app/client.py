@@ -11,8 +11,8 @@ DISCONNECTED = 'disconnected'
 BINDED = 'binded'
 UNBINDED = 'unbinded'
 
-class MyProtocol(Protocol, PDUBin):
 
+class MyProtocol(Protocol, PDUBin):
     def __init__(self):
         self.SMSCOUNT = SMSCOUNT
         self.submit_sm_resp_count = 0
@@ -126,6 +126,7 @@ class EchoClientFactory(ClientFactory):
 
     def clientConnectionFailed(self, connector, reason):
         print 'Connection failed. Reason:', reason, '\n'
+
 
 if __name__ == '__main__':
     reactor.connectTCP(HOST, PORT, EchoClientFactory())
