@@ -21,15 +21,11 @@ class Consumer(object):
         cc = ClientCreator(reactor, AMQClient, delegate=delegate,
                            vhost=self.vhost, spec=self.specfile)
 
-        client = yield cc.connectTCP(self.host, self.port)
-        yield client.authenticate(self.user, self.password)
+        connection = yield cc.connectTCP(self.host, self.port)
+        yield connection.authenticate(self.user, self.password)
 
-        channel = yield client.channel(1)
+        channel = yield connection.channel(1)
         yield channel.channel_open()
-
-        yield channel.exchange_declare(
-            exchange="worker", type="direct",
-            durable=False, auto_delete=True)
 
         channel.queue_declare(queue="process_queue", durable=True)
 
@@ -37,23 +33,14 @@ class Consumer(object):
             queue="process_queue", exchange="worker",
             routing_key="test_routing_key")
 
-        yield channel.basic_consume(
-            queue="process_queue",
-            consumer_tag="test_consumer_tag")
+        yield channel.basic_consume(queue="process_queue", consumer_tag="test_consumer_tag", no_ack=True)
 
-        queue = yield client.queue("test_consumer_tag")
-
+        queue = yield connection.queue("test_consumer_tag")
         while True:
-            yield self.processMessage(channel, queue)
+            msg = yield queue.get()
+            print msg
 
 
-    @inlineCallbacks
-    def processMessage(self, chan, queue):
-        msg = yield queue.get()
-        print "Received: %s from channel #%s" % (
-            msg.content.body, chan.id)
-        self.processMessage(chan, queue)
-        returnValue(None)
 
 if __name__ == '__main__':
     spec = txamqp.spec.load("amqp0-8.stripped.rabbitmq.xml")

@@ -11,6 +11,8 @@ from txamqp.protocol import AMQClient
 from txamqp.content import Content
 import txamqp.spec
 
+import uuid
+
 from pdu_bin import PDUBin, MsgDataListener
 from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
 
@@ -67,15 +69,11 @@ class MyProtocol(Protocol, PDUBin):
     @inlineCallbacks
     def processSubmitSM(self, msg):
         queue = yield self.publish_channel.queue_declare(exclusive=True)
-
-        wasd = Content('Hello')
-        self.publish_channel.basic_publish(exchange='', routing_key="process_queue", content=wasd)
-        print wasd
-
-    # msg = Content('asdasdas')
-    # self.publish_channel.basic_publish(exchange='',
-    # routing_key='rpc_queue',
-    # content=msg)
+        corr_id = str(uuid.uuid4())
+        content = Content(dict({'queue': queue, 'message': msg}))
+        self.publish_channel.basic_publish(exchange='', routing_key="process_queue", content=content,
+                                           properties={'reply_to': queue.method.queue, 'correlation_id': corr_id})
+        print content
 
     def pduReceived(self, pdu):
         if pdu.commandId.key == 'submit_sm':
