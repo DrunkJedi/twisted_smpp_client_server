@@ -70,7 +70,8 @@ class MyProtocol(Protocol, PDUBin):
     def processSubmitSM(self, msg):
         queue = yield self.publish_channel.queue_declare(exclusive=True)
         corr_id = str(uuid.uuid4())
-        content = Content("asdasdas")
+        properties = {"correlation_id": corr_id, "reply_to": queue.queue}
+        content = Content(body="asdasdas", properties=properties)
         self.publish_channel.basic_publish(exchange='', routing_key="process_queue", content=content)
         print content
 

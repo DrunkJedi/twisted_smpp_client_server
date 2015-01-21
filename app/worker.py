@@ -29,9 +29,9 @@ class Consumer(object):
 
         channel.queue_declare(queue="process_queue", durable=True)
 
-        yield channel.queue_bind(
-            queue="process_queue", exchange="worker",
-            routing_key="test_routing_key")
+        # yield channel.queue_bind(
+        #     queue="process_queue", exchange="worker",
+        #     routing_key="test_routing_key")
 
         yield channel.basic_consume(queue="process_queue", consumer_tag="test_consumer_tag", no_ack=True)
 
