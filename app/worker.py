@@ -1,8 +1,10 @@
+import cPickle as pickle
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.protocol import ClientCreator
 from txamqp.protocol import AMQClient
 from txamqp.client import TwistedDelegate
+from txamqp.content import Content
 import txamqp.spec
 
 
@@ -37,9 +39,15 @@ class Consumer(object):
 
         queue = yield connection.queue("test_consumer_tag")
         while True:
-            msg = yield queue.get()
+            pkg = yield queue.get()
+            msg = pickle.loads(pkg.content.body)
             print msg
+            self.reply(channel, msg)
 
+
+    def reply(self, channel, msg):
+        content = Content('all ok')
+        channel.basic_publish(exchange='', routing_key=msg['properties']['reply_to'], content=content)
 
 
 if __name__ == '__main__':

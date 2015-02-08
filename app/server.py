@@ -12,6 +12,7 @@ from txamqp.content import Content
 import txamqp.spec
 
 import uuid
+import cPickle as pickle
 
 from pdu_bin import PDUBin, MsgDataListener
 from server_settings import CLIENT_LOGIN, CLIENT_PASSWORD
@@ -33,10 +34,12 @@ class MyProtocol(Protocol, PDUBin):
     def initRabbitConnection(self):
         spec = txamqp.spec.load('amqp0-8.stripped.rabbitmq.xml')
         delegate = TwistedDelegate()
-        protocol = yield ClientCreator(reactor, AMQClient, delegate=delegate, vhost='/',
+        self.protocol = yield ClientCreator(reactor, AMQClient, delegate=delegate, vhost='/',
                                        spec=spec).connectTCP('localhost', 5672)
-        yield protocol.start({'LOGIN': 'sergey', 'PASSWORD': 'pepsi'})
-        self.publish_channel = yield protocol.channel(1)
+        yield self.protocol.start({'LOGIN': 'sergey', 'PASSWORD': 'pepsi'})
+        self.publish_channel = yield self.protocol.channel(1)
+        self.consume_channel = yield self.protocol.channel(2)
+        yield self.consume_channel.channel_open()
         yield self.publish_channel.channel_open()
         yield self.publish_channel.queue_declare(queue='process_queue', durable=True)
 
@@ -71,9 +74,18 @@ class MyProtocol(Protocol, PDUBin):
         queue = yield self.publish_channel.queue_declare(exclusive=True)
         corr_id = str(uuid.uuid4())
         properties = {"correlation_id": corr_id, "reply_to": queue.queue}
-        content = Content(body="asdasdas", properties=properties)
+        pkg = dict(body="asdasdas", properties=properties)
+
+        content = Content(pickle.dumps(pkg))
         self.publish_channel.basic_publish(exchange='', routing_key="process_queue", content=content)
-        print content
+        self.consumeResponse(pkg)
+
+    @inlineCallbacks
+    def consumeResponse(self, msg):
+        print msg['properties']['reply_to']
+        sub_a = yield self.consume_channel.basic_consume(queue=msg['properties']['reply_to'], no_ack=True)
+        queue = yield self.protocol.queue(sub_a.consumer_tag)
+        print(yield queue.get())
 
     def pduReceived(self, pdu):
         if pdu.commandId.key == 'submit_sm':
